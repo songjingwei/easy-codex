@@ -28,6 +28,12 @@ describe("runRetro", () => {
         expect(review).toContain("vitest run: passed");
     });
 
+    it("names the two-axis code review in the checklist", () => {
+        const { review } = runRetro({ feature: "Easy Codex", implement });
+        expect(review).toContain("## Review checklist");
+        expect(review).toContain("- [ ] code-review 已完成（两轴：Standards / Spec）");
+    });
+
     it("carries review issues into the retro", () => {
         const failing: ImplementResult = {
             ...implement,

@@ -1,8 +1,7 @@
 import { execFile } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
-import { slugify } from "./spec.js";
+import { writeArtifact } from "./artifacts.js";
 import { Ticket } from "./tickets.js";
 
 const exec = promisify(execFile);
@@ -27,7 +26,6 @@ export interface ImplementInput {
     feature: string;
     tickets: Ticket[];
     cwd?: string;
-    runner?: TestRunner;
 }
 
 export interface ReviewSummary {
@@ -44,9 +42,9 @@ export interface ImplementResult {
 }
 
 export const defaultTestRunner: TestRunner = async (cwd) => {
-    const command = "./node_modules/.bin/vitest run";
+    const command = "pnpm test";
     try {
-        const { stdout } = await exec("./node_modules/.bin/vitest", ["run"], { cwd });
+        const { stdout } = await exec("pnpm", ["test"], { cwd });
         return { command, passed: true, output: stdout.split("\n").slice(-12).join("\n") };
     } catch (err) {
         const e = err as { stdout?: string; stderr?: string; message?: string };
@@ -85,14 +83,14 @@ function renderAcceptance(
         "",
         "## 质量门禁",
         `- [${tests.passed ? "x" : " "}] \`${tests.command}\` 通过`,
-        "- [ ] `tsc --noEmit` 通过",
+        "- [ ] `pnpm run build` 通过",
         "",
     ].join("\n");
 }
 
 export async function runImplement(
     input: ImplementInput,
-    runner: TestRunner = input.runner ?? defaultTestRunner,
+    runner: TestRunner = defaultTestRunner,
 ): Promise<ImplementResult> {
     const cwd = input.cwd ?? process.cwd();
     const tests = await runner(cwd);
@@ -120,9 +118,11 @@ export async function writeAcceptance(
     result: ImplementResult,
     baseDir: string = "acceptance",
 ): Promise<{ dir: string; acceptancePath: string }> {
-    const dir = join(baseDir, slugify(result.feature));
-    await mkdir(dir, { recursive: true });
-    const acceptancePath = join(dir, "acceptance.md");
-    await writeFile(acceptancePath, result.acceptance, "utf8");
-    return { dir, acceptancePath };
+    const acceptancePath = await writeArtifact(
+        baseDir,
+        result.feature,
+        "acceptance.md",
+        result.acceptance,
+    );
+    return { dir: dirname(acceptancePath), acceptancePath };
 }

@@ -50,6 +50,12 @@ describe("runTickets", () => {
         expect(tickets[1].body).toContain("Depends on: #01");
     });
 
+    it("uses the project quality gates from the acceptance template", () => {
+        const { tickets } = runTickets({ feature: "Easy Codex", spec });
+        expect(tickets[0].body).toContain("- [ ] `pnpm run build` 通过");
+        expect(tickets[0].body).toContain("- [ ] `pnpm test` 通过");
+    });
+
     it("falls back to a single ticket when the spec has no AC lines", () => {
         const emptySpec = { feature: "X", prd: "P", spec: "# S\n" };
         const { tickets } = runTickets({ feature: "X", spec: emptySpec });

@@ -19,6 +19,6 @@ Single-context layout: root `GLOSSARY.md` + `docs/adr/`. See `docs/agents/domain
 ## Working agreements
 
 - Seven-phase workflow: clarify → spec → design → tickets → implement → accept → retro (`src/workflow.ts`).
-- Phase artifacts land in the repo (`specs/`, `tickets/`, `acceptance/`) and are bound to Git versions; approval is recorded per phase (`approved:<phase>` commit tags).
-- Session state persists in `.easy-codex/agent.sqlite` (never committed).
-- Tests: Vitest (`pnpm test`); type check: `tsc --noEmit` (`pnpm run build`).
+- Phase artifacts land in the repo (`specs/`, `tickets/`, `acceptance/`) and are bound to Git versions; approval is recorded per phase (`approved:<phase>` commit markers + `.easy-codex/memos.json`).
+- Run state lives in `.easy-codex/` (never committed): `agent.sqlite` (durable session), `workflow.json` (phase checkpoint), `memos.json` (approval memos).
+- Gates: `pnpm run build` (tsc build) and `pnpm test` (Vitest).

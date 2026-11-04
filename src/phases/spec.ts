@@ -1,5 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname } from "node:path";
+import { writeArtifact } from "./artifacts.js";
 import { ClarifyResult } from "./clarify.js";
 
 /**
@@ -109,11 +109,7 @@ export async function writeSpec(
     result: SpecResult,
     baseDir: string = "specs",
 ): Promise<WrittenSpec> {
-    const dir = join(baseDir, slugify(result.feature));
-    await mkdir(dir, { recursive: true });
-    const prdPath = join(dir, "prd.md");
-    const specPath = join(dir, "spec.md");
-    await writeFile(prdPath, result.prd, "utf8");
-    await writeFile(specPath, result.spec, "utf8");
-    return { dir, prdPath, specPath };
+    const prdPath = await writeArtifact(baseDir, result.feature, "prd.md", result.prd);
+    const specPath = await writeArtifact(baseDir, result.feature, "spec.md", result.spec);
+    return { dir: dirname(prdPath), prdPath, specPath };
 }
