@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { INITIAL_WORKFLOW_STATE, WorkflowState } from "./workflow";
+import { INITIAL_WORKFLOW_STATE, WorkflowState } from "./workflow.js";
 
 /**
  * Recoverable workflow state (User story 8): persisted next to the durable

@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { Phase } from "./workflow";
+import { Phase } from "./workflow.js";
 
 const exec = promisify(execFile);
 

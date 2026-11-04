@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { ClarifyResult } from "./clarify";
+import { ClarifyResult } from "./clarify.js";
 
 /**
  * Phase 2 — spec (`to-spec`).

@@ -2,8 +2,8 @@ import { execFile } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { slugify } from "./spec";
-import { Ticket } from "./tickets";
+import { slugify } from "./spec.js";
+import { Ticket } from "./tickets.js";
 
 const exec = promisify(execFile);
 
