@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
     Phase,
+    PHASE_ORDER,
     INITIAL_WORKFLOW_STATE,
     advancePhase,
+    nextPhase,
     recordApproval,
 } from "./workflow";
 
@@ -78,6 +80,16 @@ describe("recordApproval", () => {
 
 describe("Phase ordering", () => {
     const EXPECTED: Phase[] = ["clarify", "spec", "design", "tickets", "implement", "accept", "retro"];
+
+    it("PHASE_ORDER lists all seven phases in workflow order", () => {
+        expect(PHASE_ORDER).toEqual(EXPECTED);
+    });
+
+    it("nextPhase steps to the following phase", () => {
+        expect(nextPhase("clarify")).toBe("spec");
+        expect(nextPhase("implement")).toBe("accept");
+        expect(nextPhase("retro")).toBeUndefined();
+    });
 
     it("advancePhase reaches every phase in sequence", () => {
         let s = INITIAL_WORKFLOW_STATE;

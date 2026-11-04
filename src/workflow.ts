@@ -7,6 +7,22 @@ export type Phase =
     | "accept"
     | "retro";
 
+export const PHASE_ORDER: readonly Phase[] = [
+    "clarify",
+    "spec",
+    "design",
+    "tickets",
+    "implement",
+    "accept",
+    "retro",
+] as const;
+
+/** The phase after `phase`, or undefined when `phase` is the last one. */
+export function nextPhase(phase: Phase): Phase | undefined {
+    const i = PHASE_ORDER.indexOf(phase);
+    return i >= 0 ? PHASE_ORDER[i + 1] : undefined;
+}
+
 export interface WorkflowState {
     currentPhase: Phase;
     approvedAt?: Partial<Record<Phase, string>>; // phase -> ISO timestamp of user approval
