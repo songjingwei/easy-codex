@@ -90,17 +90,28 @@ export const DEFAULT_OPEN_QUESTIONS = [
     "还有哪些待决问题（open questions）需要确认？",
 ];
 
+/**
+ * Questions still unanswered for a clarification result: one per missing
+ * scenarios/scope/non-goals field, plus the always-open catch-all question.
+ */
+export function remainingQuestions(
+    result: Pick<ClarifyResult, "scenarios" | "scope" | "nonGoals">,
+): string[] {
+    const openQuestions: string[] = [];
+    if (result.scenarios.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[0]);
+    if (result.scope.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[1]);
+    if (result.nonGoals.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[2]);
+    openQuestions.push(DEFAULT_OPEN_QUESTIONS[3]);
+    return openQuestions;
+}
+
 export const defaultClarifyGenerator: ClarifyGenerator = (input) => {
     const focusDocs = selectDocs(input.requirement, input.docs ?? []);
     const scope = pickByKeywords(input.requirement, ["范围", "包含", "scope", "include"]);
     const nonGoals = pickByKeywords(input.requirement, ["非目标", "不包含", "除外", "out of scope", "exclude"]);
     const scenarios = pickByKeywords(input.requirement, ["场景", "作为", "scenario", "as a"]);
 
-    const openQuestions: string[] = [];
-    if (scenarios.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[0]);
-    if (scope.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[1]);
-    if (nonGoals.length === 0) openQuestions.push(DEFAULT_OPEN_QUESTIONS[2]);
-    openQuestions.push(DEFAULT_OPEN_QUESTIONS[3]);
+    const openQuestions = remainingQuestions({ scenarios, scope, nonGoals });
 
     return {
         requirement: input.requirement.trim(),
@@ -138,12 +149,7 @@ export function applyClarifyAnswers(
     const scope = answers.scope ?? result.scope;
     const nonGoals = answers.nonGoals ?? result.nonGoals;
 
-    const remaining = DEFAULT_OPEN_QUESTIONS.filter((q) => {
-        if (q === DEFAULT_OPEN_QUESTIONS[0]) return scenarios.length === 0;
-        if (q === DEFAULT_OPEN_QUESTIONS[1]) return scope.length === 0;
-        if (q === DEFAULT_OPEN_QUESTIONS[2]) return nonGoals.length === 0;
-        return true;
-    });
+    const remaining = remainingQuestions({ scenarios, scope, nonGoals });
 
     return {
         ...result,

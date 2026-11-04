@@ -5,6 +5,7 @@ import {
     selectDocs,
     runClarify,
     applyClarifyAnswers,
+    remainingQuestions,
     DEFAULT_OPEN_QUESTIONS,
 } from "./clarify";
 
@@ -81,6 +82,20 @@ describe("runClarify", () => {
             }),
         );
         expect(result.goal).toBe("custom goal");
+    });
+});
+
+describe("remainingQuestions", () => {
+    it("asks for every unanswered field plus the catch-all question", () => {
+        expect(
+            remainingQuestions({ scenarios: [], scope: [], nonGoals: [] }),
+        ).toEqual(DEFAULT_OPEN_QUESTIONS);
+    });
+
+    it("keeps only the catch-all question once fields are answered", () => {
+        expect(
+            remainingQuestions({ scenarios: ["s"], scope: ["s"], nonGoals: ["s"] }),
+        ).toEqual([DEFAULT_OPEN_QUESTIONS[3]]);
     });
 });
 
