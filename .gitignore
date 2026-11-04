@@ -1,6 +1,6 @@
 node_modules/
 dist/
-.easy-codex/agent.sqlite
+.easy-codex/
 .pnpm-store/
 .vite/
 .vitest/
