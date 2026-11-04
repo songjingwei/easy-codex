@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.easy-codex/
+.pnpm-store/
+.vite/
+.vitest/
