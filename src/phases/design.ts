@@ -1,6 +1,6 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { SpecResult, slugify } from "./spec.js";
+import { dirname } from "node:path";
+import { writeArtifact } from "./artifacts.js";
+import { SpecResult } from "./spec.js";
 
 /**
  * Phase 3 — design.
@@ -79,9 +79,6 @@ export async function writeDesign(
     result: DesignResult,
     baseDir: string = "specs",
 ): Promise<WrittenDesign> {
-    const dir = join(baseDir, slugify(result.feature));
-    await mkdir(dir, { recursive: true });
-    const designPath = join(dir, "design.md");
-    await writeFile(designPath, result.design, "utf8");
-    return { dir, designPath };
+    const designPath = await writeArtifact(baseDir, result.feature, "design.md", result.design);
+    return { dir: dirname(designPath), designPath };
 }

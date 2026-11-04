@@ -1,6 +1,5 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { slugify } from "./spec.js";
+import { dirname } from "node:path";
+import { writeArtifact } from "./artifacts.js";
 import { ImplementResult } from "./implement.js";
 
 /**
@@ -41,6 +40,9 @@ export const defaultRetroGenerator: RetroGenerator = ({
         "## Test status",
         `- ${implement.tests.command}: ${implement.tests.passed ? "passed" : "FAILED"}`,
         "",
+        "## Review checklist",
+        "- [ ] code-review 已完成（两轴：Standards / Spec）",
+        "",
         "## Risks / notes",
         ...(reviewNotes.length ? reviewNotes.map((n) => `- ${n}`) : ["- 无"]),
         "",
@@ -76,11 +78,7 @@ export async function writeRetro(
     result: RetroResult,
     baseDir: string = "specs",
 ): Promise<{ dir: string; reviewPath: string; retroPath: string }> {
-    const dir = join(baseDir, slugify(result.feature));
-    await mkdir(dir, { recursive: true });
-    const reviewPath = join(dir, "review.md");
-    const retroPath = join(dir, "retro.md");
-    await writeFile(reviewPath, result.review, "utf8");
-    await writeFile(retroPath, result.retro, "utf8");
-    return { dir, reviewPath, retroPath };
+    const reviewPath = await writeArtifact(baseDir, result.feature, "review.md", result.review);
+    const retroPath = await writeArtifact(baseDir, result.feature, "retro.md", result.retro);
+    return { dir: dirname(reviewPath), reviewPath, retroPath };
 }

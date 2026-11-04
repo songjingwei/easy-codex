@@ -1,5 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { writeArtifact } from "./artifacts.js";
 import { SpecResult, slugify } from "./spec.js";
 
 /**
@@ -65,8 +64,8 @@ export const defaultTicketsGenerator: TicketsGenerator = ({ feature, spec }) => 
             "",
             "## Acceptance",
             `- [ ] ${item}`,
-            "- [ ] `tsc --noEmit` 通过",
-            "- [ ] `vitest run` 通过",
+            "- [ ] `pnpm run build` 通过",
+            "- [ ] `pnpm test` 通过",
             "",
         ].join("\n");
         return { id, slug, title: titleFor(item), dependsOn, body };
@@ -85,13 +84,16 @@ export async function writeTickets(
     result: TicketsResult,
     baseDir: string = "tickets",
 ): Promise<string[]> {
-    const dir = join(baseDir, slugify(result.feature));
-    await mkdir(dir, { recursive: true });
     const paths: string[] = [];
     for (const ticket of result.tickets) {
-        const path = join(dir, `${ticket.id}-${ticket.slug}.md`);
-        await writeFile(path, ticket.body, "utf8");
-        paths.push(path);
+        paths.push(
+            await writeArtifact(
+                baseDir,
+                result.feature,
+                `${ticket.id}-${ticket.slug}.md`,
+                ticket.body,
+            ),
+        );
     }
     return paths;
 }

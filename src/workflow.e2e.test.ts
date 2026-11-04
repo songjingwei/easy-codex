@@ -100,12 +100,14 @@ describe("seven-phase workflow (end to end)", () => {
         expect(state.currentPhase).toBe("implement");
 
         // ---- phase 5: implement (tests + review + acceptance doc) ----
-        const implemented = await runImplement({
-            feature: "Easy Codex",
-            tickets: ticketsResult.tickets,
-            cwd: dir,
-            runner: passingRunner,
-        });
+        const implemented = await runImplement(
+            {
+                feature: "Easy Codex",
+                tickets: ticketsResult.tickets,
+                cwd: dir,
+            },
+            passingRunner,
+        );
         expect(implemented.tests.passed).toBe(true);
         const acceptanceFile = await writeAcceptance(implemented, join(dir, "acceptance"));
         expect(await readFile(acceptanceFile.acceptancePath, "utf8")).toContain(
