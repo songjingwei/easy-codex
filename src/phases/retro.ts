@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { slugify } from "./spec";
-import { ImplementResult } from "./implement";
+import { slugify } from "./spec.js";
+import { ImplementResult } from "./implement.js";
 
 /**
  * Phase 7 — retro (`retro` + `code-review`).

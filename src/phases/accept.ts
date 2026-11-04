@@ -1,5 +1,5 @@
-import { commitApproval, currentCommit } from "../git";
-import { ApprovalMemo, MEMOS_PATH, recordMemo } from "../memo";
+import { commitApproval, currentCommit } from "../git.js";
+import { ApprovalMemo, MEMOS_PATH, recordMemo } from "../memo.js";
 
 /**
  * Phase 6 — accept (user acceptance, human-in-the-loop).

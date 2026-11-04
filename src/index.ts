@@ -1,5 +1,5 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { createHarness } from "./harness";
+import { createHarness } from "./harness.js";
 import {
     Phase,
     PHASE_ORDER,
@@ -7,14 +7,14 @@ import {
     nextPhase,
     recordApproval,
     WorkflowState,
-} from "./workflow";
-import { loadState, saveState } from "./state";
+} from "./workflow.js";
+import { loadState, saveState } from "./state.js";
 import {
     ClarifyResult,
     DocReference,
     loadProjectDocs,
     runClarify,
-} from "./phases/clarify";
+} from "./phases/clarify.js";
 
 /**
  * CLI / Web entry (D2). `pnpm run dev` starts here:

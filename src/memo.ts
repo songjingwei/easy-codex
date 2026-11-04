@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import { Phase } from "./workflow";
+import { Phase } from "./workflow.js";
 
 /**
  * An approval memo binds a phase approval to a specific Git commit and the

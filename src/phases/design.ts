@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { SpecResult, slugify } from "./spec";
+import { SpecResult, slugify } from "./spec.js";
 
 /**
  * Phase 3 — design.
