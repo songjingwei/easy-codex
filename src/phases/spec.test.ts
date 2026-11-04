@@ -53,7 +53,8 @@ describe("runSpec", () => {
     it("provides fallback stories when clarification had none", () => {
         const bare: ClarifyResult = { ...clarify, scenarios: [], scope: [], nonGoals: [] };
         const { prd, spec } = runSpec({ feature: "Easy Codex", clarify: bare });
-        expect(prd).toContain("开发者输入需求并得到可验收的功能");
+        expect(prd).toContain("输入一句需求「做一个可恢复的开发 Agent」，进入七阶段工作流");
+        expect(prd).toContain("按澄清确认的范围执行");
         expect(spec).toContain("AC-1");
     });
 
