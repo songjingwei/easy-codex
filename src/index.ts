@@ -1,5 +1,12 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createHarness } from "./harness.js";
+import { commitApproval, currentCommit } from "./git.js";
+import {
+    ApprovalMemo,
+    affectedByChanges,
+    readMemos,
+    recordMemo,
+} from "./memo.js";
 import {
     Phase,
     PHASE_ORDER,
@@ -29,12 +36,18 @@ export interface CliDeps {
     saveStateFn?: (state: WorkflowState, path?: string) => Promise<void>;
     loadDocs?: () => Promise<DocReference[]>;
     statePath?: string;
+    gitCommit?: typeof commitApproval;
+    gitHead?: typeof currentCommit;
+    recordMemoFn?: typeof recordMemo;
+    readMemosFn?: typeof readMemos;
 }
 
 export interface CliResult {
     output: string;
     state: WorkflowState;
     clarify?: ClarifyResult;
+    memo?: ApprovalMemo;
+    commit?: string;
 }
 
 export const USAGE = [
@@ -43,10 +56,25 @@ export const USAGE = [
     "用法:",
     '  pnpm run dev "你的需求"          进入 clarify 阶段',
     "  pnpm run dev --status            查看当前阶段与批准记录",
-    "  pnpm run dev --approve <phase>   记录阶段批准并推进到下一阶段",
+    "  pnpm run dev --approve <phase> [--no-commit] [--artifacts a,b]",
+    "                                   记录阶段批准（绑定 Git 提交与 memo）并推进",
+    "  pnpm run dev --affected <path...>  查看受产物变更影响、需重新确认的批准",
     "",
     `阶段顺序: ${PHASE_ORDER.join(" → ")}`,
 ].join("\n");
+
+/** `--artifacts a,b` → ["a", "b"]; undefined when the flag is absent/empty. */
+function parseArtifacts(argv: string[]): string[] | undefined {
+    const index = argv.indexOf("--artifacts");
+    if (index < 0) return undefined;
+    const value = argv[index + 1];
+    if (!value) return undefined;
+    const artifacts = value
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+    return artifacts.length ? artifacts : undefined;
+}
 
 function statusText(state: WorkflowState): string {
     const approvals = Object.entries(state.approvedAt ?? {});
@@ -89,6 +117,10 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
     const initHarness = deps.initHarness ?? (async () => createHarness());
     const load = deps.loadStateFn ?? loadState;
     const save = deps.saveStateFn ?? saveState;
+    const gitCommit = deps.gitCommit ?? commitApproval;
+    const gitHead = deps.gitHead ?? currentCommit;
+    const recordMemoFn = deps.recordMemoFn ?? recordMemo;
+    const readMemosFn = deps.readMemosFn ?? readMemos;
     const statePath = deps.statePath;
 
     await initHarness();
@@ -96,6 +128,16 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
 
     if (argv.includes("--status")) {
         return { output: statusText(state), state };
+    }
+
+    const affectedIndex = argv.indexOf("--affected");
+    if (affectedIndex >= 0) {
+        const paths = argv.slice(affectedIndex + 1).filter((a) => !a.startsWith("--"));
+        const affected = affectedByChanges(await readMemosFn(), paths);
+        const output = affected.length
+            ? affected.map((m) => `受影响批准: ${m.phase} (commit ${m.commit})`).join("\n")
+            : "受影响批准: 无";
+        return { output, state };
     }
 
     const approveIndex = argv.indexOf("--approve");
@@ -106,6 +148,19 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
                 `未知阶段: ${phase ?? "(缺少参数)"}；可选: ${PHASE_ORDER.join(", ")}`,
             );
         }
+
+        const cwd = process.cwd();
+        const commit = argv.includes("--no-commit")
+            ? await gitHead(cwd)
+            : await gitCommit(phase, cwd, `chore: approve ${phase}`);
+        const memo: ApprovalMemo = {
+            phase,
+            commit,
+            approvedAt: new Date().toISOString(),
+            artifacts: parseArtifacts(argv),
+        };
+        await recordMemoFn(memo);
+
         const approved = recordApproval(state, phase);
         const next = nextPhase(phase);
         state = next ? advancePhase(approved, next) : approved;
@@ -113,6 +168,8 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
         return {
             output: `已批准 ${phase} → 当前阶段: ${state.currentPhase}`,
             state,
+            memo,
+            commit,
         };
     }
 
