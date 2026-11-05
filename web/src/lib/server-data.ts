@@ -53,7 +53,7 @@ export function loadKanbanReport(rootDir: string): KanbanLoadResult {
   const easyCodexDir = join(rootDir, '.easy-codex')
 
   const state = readJsonFile<WorkflowStateLite>(join(easyCodexDir, 'workflow.json'), warnings)
-  const memos = readJsonFile<ApprovalMemoLite[]>(join(easyCodexDir, 'memos.json'), warnings)
+  const memos = normalizeMemos(readJsonFile<unknown>(join(easyCodexDir, 'memos.json'), warnings))
 
   return { model: buildKanban({ state, memos }), warnings }
 }
@@ -116,6 +116,19 @@ export function findRepoRoot(startDir: string): string {
 }
 
 // --- internals -------------------------------------------------------------
+
+/**
+ * memos.json is persisted by the root package as `{ "memos": [...] }`
+ * (src/memo.ts); tolerate a bare array too so hand-edited files still work.
+ */
+function normalizeMemos(parsed: unknown): ApprovalMemoLite[] | undefined {
+  if (Array.isArray(parsed)) return parsed as ApprovalMemoLite[]
+  if (parsed !== null && typeof parsed === 'object') {
+    const wrapped = (parsed as { memos?: unknown }).memos
+    if (Array.isArray(wrapped)) return wrapped as ApprovalMemoLite[]
+  }
+  return undefined
+}
 
 /**
  * Read + parse a JSON file tolerantly:

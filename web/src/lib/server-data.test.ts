@@ -43,14 +43,17 @@ describe('loadKanban', () => {
         currentPhase: 'spec',
         approvedAt: { clarify: '2026-01-01T09:00:00Z' },
       }),
-      'memos.json': JSON.stringify([
-        {
-          phase: 'clarify',
-          commit: 'abcdef1234567890',
-          approvedAt: '2026-01-01T09:00:00Z',
-          artifacts: ['specs/web-kanban/spec.md'],
-        },
-      ]),
+      // real on-disk shape written by root src/memo.ts: { memos: [...] }
+      'memos.json': JSON.stringify({
+        memos: [
+          {
+            phase: 'clarify',
+            commit: 'abcdef1234567890',
+            approvedAt: '2026-01-01T09:00:00Z',
+            artifacts: ['specs/web-kanban/spec.md'],
+          },
+        ],
+      }),
     })
 
     const model = loadKanban(root)
@@ -114,6 +117,20 @@ describe('loadKanban', () => {
     expect(report.model.currentPhase).toBe('clarify')
     expect(report.model.columns.every((c) => c.status !== 'approved')).toBe(true)
     expect(report.warnings).toEqual([])
+  })
+
+  it('also accepts a bare memos array (hand-edited tolerance)', () => {
+    writeEasyCodex({
+      'workflow.json': JSON.stringify({ currentPhase: 'spec' }),
+      'memos.json': JSON.stringify([
+        { phase: 'clarify', commit: 'abcdef1234567890', approvedAt: '2026-01-01T09:00:00Z' },
+      ]),
+    })
+
+    const model = loadKanban(root)
+
+    expect(model.columns[0]).toMatchObject({ status: 'approved', commit: 'abcdef1234567890' })
+    expect(model.columns[1]?.status).toBe('awaiting')
   })
 })
 
