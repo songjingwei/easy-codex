@@ -1,0 +1,239 @@
+/* Minimal kanban styling (ticket 03): system fonts, simple cards, no
+   component library. See design.md — internal-tool minimal by intent. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: #f5f6f8;
+  color: #1f2328;
+}
+
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 22px;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  margin: 0 0 16px;
+  color: #59636e;
+  font-size: 14px;
+}
+
+/* --- banners ------------------------------------------------------------- */
+
+.banner {
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  border: 1px solid transparent;
+}
+
+.banner.error {
+  background: #ffebe9;
+  border-color: #ffc1bc;
+  color: #a40e26;
+}
+
+.banner.warning {
+  background: #fff8c5;
+  border-color: #d4a72c66;
+  color: #7d4e00;
+}
+
+/* --- board --------------------------------------------------------------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.column {
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 10px;
+  padding: 12px 10px;
+  min-height: 180px;
+}
+
+.column.current {
+  border: 2px solid #0969da;
+  background: #f0f7ff;
+}
+
+.column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.column-head h2 {
+  font-size: 14px;
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.badge {
+  font-size: 11px;
+  background: #0969da;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.sha {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  background: #ddf4ff;
+  border: 1px solid #b6e3ff;
+  border-radius: 6px;
+  padding: 1px 6px;
+  align-self: flex-start;
+}
+
+.approved-at {
+  color: #59636e;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.unapproved {
+  color: #6e7781;
+}
+
+/* --- artifact list ------------------------------------------------------- */
+
+.artifacts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.artifacts .empty {
+  color: #8c959f;
+  font-size: 12px;
+}
+
+.artifact-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: #0969da;
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.artifact-link:hover {
+  background: #ddf4ff;
+}
+
+/* --- artifact viewer modal ------------------------------------------------ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(31, 35, 40, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 10;
+}
+
+.modal {
+  background: #ffffff;
+  border-radius: 10px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #d0d7de;
+  font-size: 13px;
+}
+
+.modal-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.close {
+  background: none;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+  color: #59636e;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.close:hover {
+  background: #eef1f4;
+}
+
+.modal-content {
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.modal-loading {
+  padding: 20px;
+  margin: 0;
+  color: #59636e;
+}
+
+/* --- narrow screens ------------------------------------------------------ */
+
+@media (max-width: 1100px) {
+  .board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
