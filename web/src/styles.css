@@ -124,6 +124,32 @@ h1 {
   color: #6e7781;
 }
 
+/* --- approve action (ticket 04) ------------------------------------------ */
+
+.approve-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  background: #0969da;
+  border: 1px solid #0550ae;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.approve-btn:hover:not(:disabled) {
+  background: #0550ae;
+}
+
+.approve-btn:disabled {
+  background: #8c959f;
+  border-color: #8c959f;
+  cursor: not-allowed;
+}
+
 /* --- artifact list ------------------------------------------------------- */
 
 .artifacts {

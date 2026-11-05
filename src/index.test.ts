@@ -1,4 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { runCli, USAGE, CliDeps } from "./index";
 import { INITIAL_WORKFLOW_STATE, WorkflowState } from "./workflow";
 import { ApprovalMemo } from "./memo";
@@ -149,6 +154,45 @@ describe("runCli", () => {
 
     it("rejects unknown phases", async () => {
         await expect(runCli(["--approve", "nope"], deps())).rejects.toThrow(/未知阶段/);
+    });
+
+    it("resolves git, state and memo paths against deps.cwd (web server passes the repo root)", async () => {
+        const exec = promisify(execFile);
+        const dir = await mkdtemp(join(tmpdir(), "easy-codex-cwd-"));
+        try {
+            await exec("git", ["init", "-q"], { cwd: dir });
+            await exec("git", ["config", "user.email", "test@example.com"], { cwd: dir });
+            await exec("git", ["config", "user.name", "Test"], { cwd: dir });
+            await exec("git", ["commit", "-q", "--allow-empty", "-m", "base"], { cwd: dir });
+
+            const { commit } = await runCli(["--approve", "clarify"], {
+                initHarness: noopHarness,
+                cwd: dir,
+            });
+
+            // Approval commit landed in the cwd repo, not process.cwd().
+            const { stdout: message } = await exec(
+                "git",
+                ["log", "-1", "--format=%B"],
+                { cwd: dir },
+            );
+            expect(message).toContain("approved:clarify");
+            expect(commit).toMatch(/^[0-9a-f]{40}$/);
+
+            // State + memos were written under the cwd repo too.
+            const state = JSON.parse(
+                await readFile(join(dir, ".easy-codex/workflow.json"), "utf8"),
+            ) as WorkflowState;
+            expect(state.currentPhase).toBe("spec");
+            const memos = JSON.parse(
+                await readFile(join(dir, ".easy-codex/memos.json"), "utf8"),
+            ) as { memos: ApprovalMemo[] };
+            expect(memos.memos).toHaveLength(1);
+            expect(memos.memos[0].phase).toBe("clarify");
+            expect(memos.memos[0].commit).toBe(commit);
+        } finally {
+            await rm(dir, { recursive: true, force: true });
+        }
     });
 
     it("resumes from a persisted checkpoint (User story 8)", async () => {

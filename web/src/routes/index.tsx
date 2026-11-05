@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
-import { getKanban, readArtifactFn } from '../lib/fns'
+import { approvePhase, getKanban, readArtifactFn } from '../lib/fns'
 import type { KanbanModel } from '../lib/kanban'
 import '../styles.css'
 
@@ -33,6 +33,8 @@ function Home() {
   const [artifact, setArtifact] = useState<OpenArtifact | null>(null)
   const [artifactError, setArtifactError] = useState<string | null>(null)
   const [artifactLoading, setArtifactLoading] = useState(false)
+  const [approving, setApproving] = useState(false)
+  const [approveError, setApproveError] = useState<string | null>(null)
 
   // 2s polling via router.invalidate() → loader re-runs → getKanban re-reads
   // disk. Paused while the tab is hidden; interval + listener removed on unmount.
@@ -74,6 +76,30 @@ function Home() {
     setArtifactError(null)
   }, [])
 
+  // Current-phase approval (spec BR-4): confirm → POST approvePhase →
+  // immediately invalidate (the 2s poll also picks it up) or surface the
+  // error verbatim in a banner. Never fails silently.
+  const approve = useCallback(
+    async (phase: string) => {
+      if (!window.confirm(`批准 ${phase}？将生成 approved:${phase} 提交并推进到下一阶段`)) return
+      setApproving(true)
+      setApproveError(null)
+      try {
+        const result = await approvePhase({ data: { phase } })
+        if (result.ok) {
+          await router.invalidate()
+        } else {
+          setApproveError(result.error)
+        }
+      } catch (err) {
+        setApproveError(err instanceof Error ? err.message : String(err))
+      } finally {
+        setApproving(false)
+      }
+    },
+    [router],
+  )
+
   // Esc closes the artifact viewer.
   useEffect(() => {
     if (!artifact && !artifactError) return
@@ -97,6 +123,11 @@ function Home() {
       {data.ok && data.warnings.length > 0 && (
         <div className="banner warning" role="alert">
           状态文件异常（已按默认状态渲染）：{data.warnings.join('；')}
+        </div>
+      )}
+      {approveError && (
+        <div className="banner error" role="alert">
+          批准失败：{approveError}
         </div>
       )}
 
@@ -124,6 +155,16 @@ function Home() {
                     <span className="unapproved">未批准</span>
                   )}
                 </div>
+                {isCurrent && col.status !== 'approved' && (
+                  <button
+                    type="button"
+                    className="approve-btn"
+                    disabled={approving}
+                    onClick={() => void approve(col.phase)}
+                  >
+                    {approving ? '批准中…' : '批准'}
+                  </button>
+                )}
                 <ul className="artifacts">
                   {col.artifacts.length === 0 ? (
                     <li className="empty">无产物</li>
