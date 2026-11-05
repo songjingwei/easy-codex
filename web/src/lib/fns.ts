@@ -1,8 +1,10 @@
-// Thin server functions (ticket 03). All disk access and validation lives in
-// server-data.ts; these only wire it to createServerFn and map thrown errors
-// to serializable {error} shapes the UI can render as a banner/toast.
+// Thin server functions (ticket 03 + 04). Disk access and validation live in
+// server-data.ts / approve.ts; these only wire them to createServerFn and map
+// thrown errors to serializable {error} shapes the UI can render as a
+// banner/toast.
 import { createServerFn } from '@tanstack/react-start'
 import type { KanbanModel } from './kanban'
+import { approvePhaseAt, type ApproveResult } from './approve'
 import { ArtifactError, findRepoRoot, loadKanbanReport, readArtifact } from './server-data'
 
 export type KanbanResult =
@@ -47,3 +49,12 @@ export const readArtifactFn = createServerFn({ method: 'GET' })
       return { ok: false, status: 500, error: message(err) }
     }
   })
+
+/**
+ * POST approve (spec BR-4): delegates to approvePhaseAt (root runCli reuse).
+ * approvePhaseAt never throws — failures come back as {ok:false, error} with
+ * the original message so the UI can show them verbatim in a banner.
+ */
+export const approvePhase = createServerFn({ method: 'POST' })
+  .validator((p: { phase: string }) => p)
+  .handler(({ data }): Promise<ApproveResult> => approvePhaseAt(repoRoot(), data.phase))
