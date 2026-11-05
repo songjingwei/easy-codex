@@ -11,4 +11,14 @@ export const PHASES = [
   'retro',
 ] as const
 
-export type Phase = (typeof PHASES)[number]
+export type PhaseName = (typeof PHASES)[number]
+
+// Backwards-compatible alias from the ticket 01 scaffold.
+export type Phase = PhaseName
+
+/** Fixed column order for the kanban board (mirrors root PHASE_ORDER). */
+export const PHASE_ORDER: readonly PhaseName[] = PHASES
+
+export function isPhaseName(value: unknown): value is PhaseName {
+  return typeof value === 'string' && (PHASE_ORDER as readonly string[]).includes(value)
+}
