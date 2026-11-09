@@ -58,6 +58,7 @@ export interface CliDeps {
 // instead of mirroring it (web-kanban ticket 04).
 export { PHASE_ORDER } from "./workflow.js";
 export type { Phase, WorkflowState } from "./workflow.js";
+export type { ApprovalMemo } from "./memo.js";
 
 export interface CliResult {
     output: string;

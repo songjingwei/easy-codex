@@ -1,6 +1,10 @@
-// Local mirrors of the root package shapes (src/workflow.ts, src/memo.ts).
-// The web package does not depend on `easy-codex` yet, so only the minimal
-// fields the kanban model needs are mirrored here. Keep in sync by hand.
+// Web-facing type aliases for the root package's on-disk shapes.
+// - ApprovalMemo is re-used from `easy-codex` (one source of truth; the
+//   web package depends on it as a workspace package).
+// - WorkflowStateLite stays local and deliberately lenient: web tolerates
+//   workflow.json entries missing createdAt/updatedAt (and only needs
+//   currentPhase + approvedAt, which buildKanban validates defensively).
+import type { ApprovalMemo } from 'easy-codex'
 import type { PhaseName } from './phases'
 
 export type { PhaseName }
@@ -12,10 +16,5 @@ export interface WorkflowStateLite {
   approvedAt?: Partial<Record<PhaseName, string>>
 }
 
-/** Minimal mirror of root `ApprovalMemo` (.easy-codex/memos.json). */
-export interface ApprovalMemoLite {
-  phase: PhaseName
-  commit: string
-  approvedAt: string
-  artifacts?: string[]
-}
+/** Re-export of the root `ApprovalMemo` under the web-local alias. */
+export type ApprovalMemoLite = ApprovalMemo
