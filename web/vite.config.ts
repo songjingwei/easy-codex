@@ -5,6 +5,9 @@ import viteReact from '@vitejs/plugin-react'
 export default defineConfig({
   server: {
     port: 3000,
+    // BR-1: the board is http://localhost:3000. A busy port must fail loudly
+    // instead of silently moving to another port.
+    strictPort: true,
   },
   resolve: {
     tsconfigPaths: true,
