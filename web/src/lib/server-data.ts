@@ -4,9 +4,9 @@
 // running server.
 //
 // Two invariants:
-// - loadKanban is tolerant: missing or corrupt .easy-codex/ JSON degrades to
-//   fresh-workflow defaults (spec Edge cases); corruption is surfaced as a
-//   warning so the UI can show a banner instead of crashing.
+// - loadKanban is tolerant: missing, corrupt or wrong-shaped .easy-codex/
+//   JSON degrades to fresh-workflow defaults (spec Edge cases); the problem
+//   is surfaced as a warning so the UI can show a banner instead of crashing.
 // - artifact reads are jail-checked: resolveArtifactPath only ever returns
 //   paths inside <rootDir>/{specs,tickets,acceptance}, throwing an
 //   ArtifactError with an HTTP-ish status (403 escape / 404 missing) that the
@@ -14,6 +14,7 @@
 import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { buildKanban, type KanbanModel } from './kanban'
+import { isPhaseName } from './phases'
 import type { ApprovalMemoLite, WorkflowStateLite } from './types'
 
 /** Repo-relative dirs artifact requests may read from. */
@@ -51,9 +52,22 @@ export function loadKanban(rootDir: string): KanbanModel {
 export function loadKanbanReport(rootDir: string): KanbanLoadResult {
   const warnings: string[] = []
   const easyCodexDir = join(rootDir, '.easy-codex')
+  const workflowFile = join(easyCodexDir, 'workflow.json')
+  const memosFile = join(easyCodexDir, 'memos.json')
 
-  const state = readJsonFile<WorkflowStateLite>(join(easyCodexDir, 'workflow.json'), warnings)
-  const memos = normalizeMemos(readJsonFile<unknown>(join(easyCodexDir, 'memos.json'), warnings))
+  const state = readJsonFile<WorkflowStateLite>(workflowFile, warnings)
+  const rawMemos = readJsonFile<unknown>(memosFile, warnings)
+  const memos = normalizeMemos(rawMemos)
+
+  // Shape checks beyond JSON parse errors: a present-but-wrong-shaped file
+  // would otherwise silently render as a fresh workflow, hiding the problem
+  // behind the acceptance claim that corruption is surfaced as a warning.
+  if (state !== undefined && !isPhaseName(state.currentPhase)) {
+    warnings.push(`unexpected workflow state shape in ${workflowFile}`)
+  }
+  if (rawMemos !== undefined && memos === undefined) {
+    warnings.push(`unexpected memos shape in ${memosFile}`)
+  }
 
   return {
     model: buildKanban({ state, memos, artifactFiles: listArtifactFiles(rootDir) }),
@@ -164,7 +178,8 @@ function normalizeMemos(parsed: unknown): ApprovalMemoLite[] | undefined {
  * Read + parse a JSON file tolerantly:
  * - missing file → undefined (first run is normal, no warning)
  * - corrupt file → undefined + warning (spec Edge case: banner, no crash)
- * - non-object / wrong-shape payload → undefined (buildKanban validates)
+ * - non-object payload → undefined + warning (shape check at the call site
+ *   additionally validates required fields)
  * - unreadable file (permissions etc.) → rethrows: unexpected I/O errors
  *   should reach the server fn and become the page-level error banner.
  */
@@ -180,7 +195,10 @@ function readJsonFile<T>(file: string, warnings: string[]): T | undefined {
 
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (parsed === null || typeof parsed !== 'object') return undefined
+    if (parsed === null || typeof parsed !== 'object') {
+      warnings.push(`unexpected JSON shape in ${file}`)
+      return undefined
+    }
     return parsed as T
   } catch {
     warnings.push(`corrupt JSON in ${file}`)

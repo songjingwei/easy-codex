@@ -107,17 +107,50 @@ describe('loadKanban', () => {
     expect(report.warnings.some((w) => w.includes('memos.json'))).toBe(true)
   })
 
-  it('treats non-object JSON payloads as missing state without warnings', () => {
+  it('warns about non-object JSON payloads but still renders defaults', () => {
     writeEasyCodex({
       'workflow.json': 'null',
-      'memos.json': '{"nope": true}',
+      'memos.json': '"nope"',
     })
 
     const report = loadKanbanReport(root)
 
     expect(report.model.currentPhase).toBe('clarify')
     expect(report.model.columns.every((c) => c.status !== 'approved')).toBe(true)
-    expect(report.warnings).toEqual([])
+    expect(report.warnings.filter((w) => w.includes('unexpected JSON shape in'))).toHaveLength(2)
+    expect(
+      report.warnings.some((w) => w.includes('unexpected JSON shape in') && w.includes('workflow.json')),
+    ).toBe(true)
+    expect(
+      report.warnings.some((w) => w.includes('unexpected JSON shape in') && w.includes('memos.json')),
+    ).toBe(true)
+  })
+
+  it('warns when workflow.json lacks a valid currentPhase (unexpected shape)', () => {
+    for (const payload of ['{}', JSON.stringify({ currentPhase: 'nope' })]) {
+      writeEasyCodex({ 'workflow.json': payload })
+
+      const report = loadKanbanReport(root)
+
+      expect(report.model.currentPhase).toBe('clarify')
+      expect(report.warnings).toHaveLength(1)
+      expect(report.warnings[0]).toContain('unexpected workflow state shape in')
+      expect(report.warnings[0]).toContain('workflow.json')
+    }
+  })
+
+  it('warns when memos.json is present but not normalizable (unexpected shape)', () => {
+    writeEasyCodex({
+      'workflow.json': JSON.stringify({ currentPhase: 'spec' }),
+      'memos.json': JSON.stringify({ nope: true }),
+    })
+
+    const report = loadKanbanReport(root)
+
+    expect(report.model.columns.every((c) => c.status !== 'approved')).toBe(true)
+    expect(report.warnings).toHaveLength(1)
+    expect(report.warnings[0]).toContain('unexpected memos shape in')
+    expect(report.warnings[0]).toContain('memos.json')
   })
 
   it('also accepts a bare memos array (hand-edited tolerance)', () => {
@@ -132,6 +165,7 @@ describe('loadKanban', () => {
 
     expect(model.columns[0]).toMatchObject({ status: 'approved', commit: 'abcdef1234567890' })
     expect(model.columns[1]?.status).toBe('awaiting')
+    expect(loadKanbanReport(root).warnings).toEqual([])
   })
 })
 
