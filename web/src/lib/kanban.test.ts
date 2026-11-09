@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildKanban } from './kanban'
+import { artifactFilesForPhase, buildKanban } from './kanban'
 import { PHASES } from './phases'
 import type { ApprovalMemoLite, PhaseName, WorkflowStateLite } from './types'
 
@@ -172,5 +172,86 @@ describe('buildKanban', () => {
     expect(model.columns[2]?.artifacts).toEqual(['specs/web-kanban/design.md', 'specs/web-kanban/spec.md'])
     expect(model.columns[1]?.artifacts).toEqual([])
     expect(model.columns.slice(3).every((c) => c.artifacts.length === 0)).toBe(true)
+  })
+
+  it('merges memo artifacts with artifact-dir files (dedup, memo order first)', () => {
+    const model = buildKanban({
+      state: state('design'),
+      memos: [memo('spec', { artifacts: ['specs/a/spec.md', 'tickets/a/01.md'] })],
+      artifactFiles: ['specs/a/prd.md', 'specs/a/spec.md', 'tickets/a/01.md'],
+    })
+
+    expect(model.columns[1]?.artifacts).toEqual([
+      'specs/a/spec.md',
+      'tickets/a/01.md',
+      'specs/a/prd.md',
+    ])
+  })
+
+  it('tolerates a non-array artifactFiles value and non-string entries', () => {
+    const nonArray = buildKanban({
+      state: state('spec'),
+      memos: [],
+      artifactFiles: 'nope' as unknown as string[],
+    })
+    expect(nonArray.columns[1]?.artifacts).toEqual([])
+
+    const messy = buildKanban({
+      state: state('spec'),
+      memos: [],
+      artifactFiles: ['specs/a/spec.md', 42, null, ''] as unknown as string[],
+    })
+    expect(messy.columns[1]?.artifacts).toEqual(['specs/a/spec.md'])
+  })
+})
+
+describe('artifactFilesForPhase', () => {
+  const files = [
+    'acceptance/a/acceptance.md',
+    'acceptance/a/nested/report.md',
+    'docs/readme.md',
+    'specs/a/design.md',
+    'specs/a/notes.md',
+    'specs/a/prd.md',
+    'specs/a/retro.md',
+    'specs/a/review.md',
+    'specs/a/spec.md',
+    'specs/a/deep/spec.md',
+    'tickets/a/01-scaffold.md',
+    'tickets/a/nested/02.md',
+  ]
+
+  it('maps spec to prd.md + spec.md but not design.md or deeper files', () => {
+    expect(artifactFilesForPhase('spec', files)).toEqual(['specs/a/prd.md', 'specs/a/spec.md'])
+  })
+
+  it('maps design to design.md only', () => {
+    expect(artifactFilesForPhase('design', files)).toEqual(['specs/a/design.md'])
+  })
+
+  it('maps tickets to every file under tickets/ (nested included)', () => {
+    expect(artifactFilesForPhase('tickets', files)).toEqual([
+      'tickets/a/01-scaffold.md',
+      'tickets/a/nested/02.md',
+    ])
+  })
+
+  it('maps both implement and accept to every file under acceptance/', () => {
+    const expected = ['acceptance/a/acceptance.md', 'acceptance/a/nested/report.md']
+    expect(artifactFilesForPhase('implement', files)).toEqual(expected)
+    expect(artifactFilesForPhase('accept', files)).toEqual(expected)
+  })
+
+  it('maps retro to review.md + retro.md only', () => {
+    expect(artifactFilesForPhase('retro', files)).toEqual(['specs/a/retro.md', 'specs/a/review.md'])
+  })
+
+  it('maps clarify to nothing even when files are given', () => {
+    expect(artifactFilesForPhase('clarify', files)).toEqual([])
+  })
+
+  it('skips non-string entries and empty strings, and sorts its output', () => {
+    const messy = ['specs/b/spec.md', 'specs/a/spec.md', 42, null, '', undefined] as unknown as string[]
+    expect(artifactFilesForPhase('spec', messy)).toEqual(['specs/a/spec.md', 'specs/b/spec.md'])
   })
 })

@@ -1,13 +1,14 @@
 // Disk-backed data layer tests (ticket 03, TDD core). Each test builds a
 // throwaway repo fixture under mkdtemp so loadKanban / resolveArtifactPath /
 // readArtifact run against real files with no shared state.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   ArtifactError,
   findRepoRoot,
+  listArtifactFiles,
   loadKanban,
   loadKanbanReport,
   readArtifact,
@@ -134,6 +135,51 @@ describe('loadKanban', () => {
   })
 })
 
+describe('listArtifactFiles', () => {
+  it('lists nested files under specs/, tickets/ and acceptance/ as sorted repo-relative paths', () => {
+    write('specs/a/prd.md', 'prd')
+    write('specs/a/deep/spec.md', 'spec')
+    write('tickets/a/01-scaffold.md', 'ticket')
+    write('acceptance/a/report.md', 'report')
+
+    expect(listArtifactFiles(root)).toEqual([
+      'acceptance/a/report.md',
+      'specs/a/deep/spec.md',
+      'specs/a/prd.md',
+      'tickets/a/01-scaffold.md',
+    ])
+  })
+
+  it('skips missing artifact dirs silently', () => {
+    expect(listArtifactFiles(root)).toEqual([])
+
+    write('specs/a/spec.md', 'spec')
+    expect(listArtifactFiles(root)).toEqual(['specs/a/spec.md'])
+  })
+
+  it('skips hidden files and directories', () => {
+    write('specs/visible.md', 'visible')
+    write('specs/.hidden.md', 'hidden')
+    write('specs/.hidden-dir/secret.md', 'secret')
+    write('tickets/.gitkeep', '')
+
+    expect(listArtifactFiles(root)).toEqual(['specs/visible.md'])
+  })
+
+  it('does not follow symlinked directories out of the artifact dirs', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'easy-codex-web03-outside-'))
+    try {
+      writeFileSync(join(outside, 'secret.txt'), 'top secret')
+      mkdirSync(join(root, 'specs'), { recursive: true })
+      symlinkSync(outside, join(root, 'specs/esc'), 'dir')
+
+      expect(listArtifactFiles(root)).toEqual([])
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('resolveArtifactPath', () => {
   it('resolves paths under specs/, tickets/ and acceptance/ (happy path)', () => {
     expect(resolveArtifactPath(root, 'specs/web-kanban/spec.md')).toBe(
@@ -193,6 +239,50 @@ describe('resolveArtifactPath', () => {
     } catch (err) {
       expect((err as ArtifactError).status).toBe(403)
     }
+  })
+
+  it('rejects a directory symlink that escapes the artifact dirs (403)', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'easy-codex-web03-secret-'))
+    try {
+      writeFileSync(join(outside, 'secret.txt'), 'top secret')
+      mkdirSync(join(root, 'specs'), { recursive: true })
+      symlinkSync(outside, join(root, 'specs/esc'), 'dir')
+
+      try {
+        resolveArtifactPath(root, 'specs/esc/secret.txt')
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect((err as ArtifactError).status).toBe(403)
+      }
+      try {
+        readArtifact(root, 'specs/esc/secret.txt')
+        expect.unreachable('should have thrown')
+      } catch (err) {
+        expect((err as ArtifactError).status).toBe(403)
+      }
+    } finally {
+      rmSync(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a file symlink pointing outside the artifact dirs (403)', () => {
+    mkdirSync(join(root, 'specs'), { recursive: true })
+    symlinkSync('/etc/hostname', join(root, 'specs/link.md'))
+
+    try {
+      resolveArtifactPath(root, 'specs/link.md')
+      expect.unreachable('should have thrown')
+    } catch (err) {
+      expect((err as ArtifactError).status).toBe(403)
+    }
+  })
+
+  it('allows a symlink that stays inside the artifact dirs (readable)', () => {
+    write('specs/demo/spec.md', 'real spec')
+    symlinkSync(join(root, 'specs/demo/spec.md'), join(root, 'specs/alias.md'))
+
+    expect(resolveArtifactPath(root, 'specs/alias.md')).toBe(join(root, 'specs/alias.md'))
+    expect(readArtifact(root, 'specs/alias.md').content).toBe('real spec')
   })
 })
 
