@@ -114,6 +114,57 @@ describe('approvePhaseAt', () => {
     expect(await git(['log', '-1', '--format=%B'])).toContain('approved:retro')
   })
 
+  it('records the phase artifacts derived from the artifact dirs in the memo', async () => {
+    await mkdir(join(dir, 'specs/demo'), { recursive: true })
+    await writeFile(join(dir, 'specs/demo/design.md'), '# Design', 'utf8')
+    await writeFile(join(dir, 'specs/demo/spec.md'), '# Spec', 'utf8')
+    const now = new Date().toISOString()
+    await mkdir(join(dir, '.easy-codex'), { recursive: true })
+    await writeFile(
+      join(dir, '.easy-codex/workflow.json'),
+      JSON.stringify({ currentPhase: 'design', approvedAt: {}, createdAt: now, updatedAt: now }),
+      'utf8',
+    )
+
+    const result = await approvePhaseAt(dir, 'design')
+    expectOk(result)
+
+    // design owns specs/*/design.md; specs/demo/spec.md belongs to the spec
+    // phase and must not leak into the design memo.
+    const memos = await readJson<{ memos: Array<{ phase: string; artifacts?: string[] }> }>(
+      join(dir, '.easy-codex/memos.json'),
+    )
+    expect(memos?.memos).toHaveLength(1)
+    expect(memos?.memos[0]?.phase).toBe('design')
+    expect(memos?.memos[0]?.artifacts).toEqual(['specs/demo/design.md'])
+  })
+
+  it('records no artifacts for clarify in a bare repo (no disk artifact)', async () => {
+    const result = await approvePhaseAt(dir, 'clarify')
+    expectOk(result)
+
+    const memos = await readJson<{ memos: Array<{ phase: string; artifacts?: string[] }> }>(
+      join(dir, '.easy-codex/memos.json'),
+    )
+    expect(memos?.memos[0]?.phase).toBe('clarify')
+    expect(memos?.memos[0]?.artifacts).toBeUndefined()
+  })
+
+  it('drops artifact paths containing commas (argv is comma-separated)', async () => {
+    await mkdir(join(dir, 'specs/de,m'), { recursive: true })
+    await writeFile(join(dir, 'specs/de,m/design.md'), '# Weird dir', 'utf8')
+    await mkdir(join(dir, 'specs/demo'), { recursive: true })
+    await writeFile(join(dir, 'specs/demo/design.md'), '# Design', 'utf8')
+
+    const result = await approvePhaseAt(dir, 'design')
+    expectOk(result)
+
+    const memos = await readJson<{ memos: Array<{ phase: string; artifacts?: string[] }> }>(
+      join(dir, '.easy-codex/memos.json'),
+    )
+    expect(memos?.memos[0]?.artifacts).toEqual(['specs/demo/design.md'])
+  })
+
   it('runs the full flow twice (clarify then spec) and keeps advancing state', async () => {
     const first = await approvePhaseAt(dir, 'clarify')
     expectOk(first)
