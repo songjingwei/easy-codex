@@ -76,9 +76,9 @@ pnpm install
 pnpm run web        # 启动 Web 看板，打开 http://localhost:3000
 ```
 
-- **七列 Kanban**：clarify → spec → design → tickets → implement → accept → retro，当前阶段高亮；已批准列显示 commit 短 SHA、批准时间与该阶段产物路径，未批准显示「未批准」。
-- **Web 批准**：当前阶段列的「批准」按钮复用 CLI 的 `--approve` 逻辑——生成 `approved:<phase>` 提交 + memo 并推进阶段，失败时错误原样展示。
-- **产物查看**：点击产物路径只读查看 Markdown 原文；请求路径限制在 `specs/`、`tickets/`、`acceptance/` 内，逃逸请求被拒绝。
+- **七列 Kanban**：clarify → spec → design → tickets → implement → accept → retro，当前阶段高亮；已批准列显示 commit 短 SHA、批准时间与该阶段产物路径（来自批准记录 memo 与产物目录 specs/、tickets/、acceptance/ 的文件列表），未批准显示「未批准」。
+- **Web 批准**：当前阶段列的「批准」按钮复用 CLI 的 `--approve` 逻辑——生成 `approved:<phase>` 提交 + memo（自动记录该阶段产物路径）并推进阶段，失败时错误原样展示。
+- **产物查看**：点击产物路径只读查看 Markdown 原文；请求路径限制在 `specs/`、`tickets/`、`acceptance/` 内，`../` 逃逸与符号链接逃逸均被拒绝。
 - **轮询刷新**：每 2s 轮询（`document.hidden` 时暂停），多个浏览器标签附接同一会话、共享同一份磁盘状态。
 
 产物与验收：`specs/web-kanban/`（PRD / Spec / Design）、`acceptance/web-kanban/acceptance.md`。
