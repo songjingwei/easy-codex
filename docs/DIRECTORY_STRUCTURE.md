@@ -39,6 +39,7 @@
 │       ├── implement.ts
 │       ├── accept.ts
 │       └── retro.ts
+├── web/                      # @easy-codex/web — Web Kanban 前端（TanStack Start，只读+批准+轮询）
 └── .easy-codex/           # 本地运行状态（已存在，gitignore，不提交）
     ├── agent.sqlite       # Pi Durable 会话（durable session）
     ├── workflow.json      # 阶段检查点（currentPhase + 批准时间戳）

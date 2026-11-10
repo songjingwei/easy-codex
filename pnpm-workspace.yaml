@@ -1,4 +1,10 @@
+packages:
+  - "web"
+
 allowBuilds:
   '@google/genai': false
   esbuild: true
   protobufjs: false
+
+minimumReleaseAgeExclude:
+  - vite@8.3.6

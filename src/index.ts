@@ -1,9 +1,11 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { join } from "node:path";
 import { createHarness } from "./harness.js";
 import { commitApproval, currentCommit } from "./git.js";
 import {
     ApprovalMemo,
     affectedByChanges,
+    MEMOS_PATH,
     readMemos,
     recordMemo,
 } from "./memo.js";
@@ -15,7 +17,7 @@ import {
     recordApproval,
     WorkflowState,
 } from "./workflow.js";
-import { loadState, saveState } from "./state.js";
+import { loadState, saveState, STATE_PATH } from "./state.js";
 import {
     ClarifyResult,
     DocReference,
@@ -40,7 +42,23 @@ export interface CliDeps {
     gitHead?: typeof currentCommit;
     recordMemoFn?: typeof recordMemo;
     readMemosFn?: typeof readMemos;
+    /**
+     * Resolve every cwd-relative operation (git commit, workflow state, memos)
+     * against this directory instead of `process.cwd()`. The web dev server
+     * runs with cwd = `web/` while state lives at the repo root, so it passes
+     * `cwd: findRepoRoot(process.cwd())`. Note: the default harness init
+     * (createHarness) is *not* redirected by this field — callers that pass
+     * `cwd` from a different process cwd should inject `initHarness` too.
+     */
+    cwd?: string;
 }
+
+// Single source of truth for the phase list/Phase type: re-exported so the
+// web package validates `--approve` input against the same PHASE_ORDER
+// instead of mirroring it (web-kanban ticket 04).
+export { PHASE_ORDER } from "./workflow.js";
+export type { Phase, WorkflowState } from "./workflow.js";
+export type { ApprovalMemo } from "./memo.js";
 
 export interface CliResult {
     output: string;
@@ -119,9 +137,13 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
     const save = deps.saveStateFn ?? saveState;
     const gitCommit = deps.gitCommit ?? commitApproval;
     const gitHead = deps.gitHead ?? currentCommit;
-    const recordMemoFn = deps.recordMemoFn ?? recordMemo;
-    const readMemosFn = deps.readMemosFn ?? readMemos;
-    const statePath = deps.statePath;
+    const cwd = deps.cwd ?? process.cwd();
+    const recordMemoFn =
+        deps.recordMemoFn ??
+        ((memo: ApprovalMemo) => recordMemo(memo, join(cwd, MEMOS_PATH)));
+    const readMemosFn =
+        deps.readMemosFn ?? (() => readMemos(join(cwd, MEMOS_PATH)));
+    const statePath = deps.statePath ?? join(cwd, STATE_PATH);
 
     await initHarness();
     let state = await load(statePath);
@@ -149,7 +171,6 @@ export async function runCli(argv: string[], deps: CliDeps = {}): Promise<CliRes
             );
         }
 
-        const cwd = process.cwd();
         const commit = argv.includes("--no-commit")
             ? await gitHead(cwd)
             : await gitCommit(phase, cwd, `chore: approve ${phase}`);
