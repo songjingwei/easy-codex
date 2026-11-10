@@ -12,6 +12,7 @@
 ├── docs/
 │   ├── agents/            # agent 技能设置（已存在）
 │   ├── adr/               # 架构决策记录（预留，空）
+│   ├── HISTORY.md         # 开发历程：里程碑、决策、弯路与教训
 │   └── DIRECTORY_STRUCTURE.md  # 本文件
 ├── specs/                 # PRD + Spec + 设计 + Retro（每需求一个子目录）
 │   └── <feature>/
