@@ -155,7 +155,10 @@ function Home() {
                     <span className="unapproved">未批准</span>
                   )}
                 </div>
-                {isCurrent && col.status !== 'approved' && (
+                {/* BR-4: the current column always offers the approve button,
+                    even when its status still reads approved — a memo/state
+                    skew must be advanceable from the UI. */}
+                {isCurrent && (
                   <button
                     type="button"
                     className="approve-btn"

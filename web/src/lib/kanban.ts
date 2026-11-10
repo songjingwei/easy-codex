@@ -24,6 +24,8 @@ export interface KanbanModel {
 export interface KanbanInput {
   state?: WorkflowStateLite | null
   memos?: ReadonlyArray<ApprovalMemoLite> | null
+  /** Repo-relative files listed from specs/, tickets/, acceptance/ (spec BR-3). */
+  artifactFiles?: readonly string[] | null
 }
 
 interface NormalizedMemo {
@@ -36,6 +38,7 @@ export function buildKanban(input: KanbanInput): KanbanModel {
   const state = input?.state
   const currentPhase = state && isPhaseName(state.currentPhase) ? state.currentPhase : 'clarify'
   const memosByPhase = collectMemos(input?.memos)
+  const files = asFileList(input?.artifactFiles)
   const currentIdx = PHASE_ORDER.indexOf(currentPhase)
 
   const columns = PHASE_ORDER.map((phase) => {
@@ -51,7 +54,14 @@ export function buildKanban(input: KanbanInput): KanbanModel {
       status = 'pending'
     }
 
-    const column: KanbanColumn = { phase, status, artifacts: memo?.artifacts ?? [] }
+    // BR-3: artifacts come from the approval memo (CLI-recorded) and from the
+    // artifact dirs themselves. Memo paths keep their order; dir-mapped files
+    // are appended (sorted) with duplicates removed.
+    const artifacts = Array.from(
+      new Set([...(memo?.artifacts ?? []), ...artifactFilesForPhase(phase, files)]),
+    )
+
+    const column: KanbanColumn = { phase, status, artifacts }
     if (memo?.commit !== undefined) column.commit = memo.commit
     const approvedAt = memo?.approvedAt ?? stateApprovedAt(state, phase)
     if (approvedAt !== undefined) column.approvedAt = approvedAt
@@ -59,6 +69,28 @@ export function buildKanban(input: KanbanInput): KanbanModel {
   })
 
   return { columns, currentPhase }
+}
+
+/** Files under the artifact dirs that belong to each phase (spec BR-3). */
+export function artifactFilesForPhase(phase: PhaseName, files: readonly string[]): string[] {
+  const patterns: Record<PhaseName, RegExp[]> = {
+    clarify: [], // conversational phase; no disk artifact
+    spec: [/^specs\/[^/]+\/prd\.md$/, /^specs\/[^/]+\/spec\.md$/],
+    design: [/^specs\/[^/]+\/design\.md$/],
+    tickets: [/^tickets\//],
+    implement: [/^acceptance\//],
+    accept: [/^acceptance\//],
+    retro: [/^specs\/[^/]+\/(review|retro)\.md$/],
+  }
+  return files
+    .filter((f): f is string => typeof f === 'string' && f.length > 0)
+    .filter((f) => patterns[phase].some((re) => re.test(f)))
+    .sort()
+}
+
+/** artifactFiles may arrive from JSON; non-arrays degrade to an empty list. */
+function asFileList(value: unknown): readonly string[] {
+  return Array.isArray(value) ? (value as readonly string[]) : []
 }
 
 /** Index memos by phase, ignoring unknown phases; the last memo wins. */

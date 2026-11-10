@@ -17,6 +17,9 @@
 //   inject a no-op. Tests still get a pure temp-dir function: every runCli dep
 //   that touches disk resolves under rootDir.
 import { PHASE_ORDER, runCli, type CliDeps } from 'easy-codex'
+import { artifactFilesForPhase } from './kanban'
+import { isPhaseName } from './phases'
+import { listArtifactFiles } from './server-data'
 
 export type ApproveResult =
   | { ok: true; phase: string; commit: string }
@@ -36,9 +39,10 @@ export async function approvePhaseAt(
   phase: string,
   deps: ApproveDeps = {},
 ): Promise<ApproveResult> {
-  // Validate against the root package's PHASE_ORDER (one source of truth) so
-  // arbitrary client input never reaches the CLI argument list.
-  if (typeof phase !== 'string' || !(PHASE_ORDER as readonly string[]).includes(phase)) {
+  // Validate against the root package's PHASE_ORDER (one source of truth, via
+  // the phases re-export) so arbitrary client input never reaches the CLI
+  // argument list; the guard also narrows `phase` to the Phase union.
+  if (!isPhaseName(phase)) {
     return {
       ok: false,
       error: `未知阶段: ${String(phase)}；可选: ${PHASE_ORDER.join(', ')}`,
@@ -46,7 +50,18 @@ export async function approvePhaseAt(
   }
 
   try {
-    const result = await runCli(['--approve', phase], {
+    // Ticket-04 acceptance: web approvals must bind the same artifact
+    // references as CLI approvals. Derive them from the artifact dirs for the
+    // phase being approved (spec BR-3) and pass them through runCli's existing
+    // `--artifacts a,b` flag. `--artifacts` is comma-separated, so paths that
+    // contain a comma are dropped instead of corrupting the list.
+    const files = artifactFilesForPhase(phase, listArtifactFiles(rootDir)).filter(
+      (f) => !f.includes(','),
+    )
+    const argv = ['--approve', phase]
+    if (files.length > 0) argv.push('--artifacts', files.join(','))
+
+    const result = await runCli(argv, {
       cwd: rootDir,
       initHarness: async () => ({}),
       ...deps,

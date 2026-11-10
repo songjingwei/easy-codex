@@ -4,16 +4,17 @@
 // running server.
 //
 // Two invariants:
-// - loadKanban is tolerant: missing or corrupt .easy-codex/ JSON degrades to
-//   fresh-workflow defaults (spec Edge cases); corruption is surfaced as a
-//   warning so the UI can show a banner instead of crashing.
+// - loadKanban is tolerant: missing, corrupt or wrong-shaped .easy-codex/
+//   JSON degrades to fresh-workflow defaults (spec Edge cases); the problem
+//   is surfaced as a warning so the UI can show a banner instead of crashing.
 // - artifact reads are jail-checked: resolveArtifactPath only ever returns
 //   paths inside <rootDir>/{specs,tickets,acceptance}, throwing an
 //   ArtifactError with an HTTP-ish status (403 escape / 404 missing) that the
 //   server function maps to a serializable error shape.
-import { readFileSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { buildKanban, type KanbanModel } from './kanban'
+import { isPhaseName } from './phases'
 import type { ApprovalMemoLite, WorkflowStateLite } from './types'
 
 /** Repo-relative dirs artifact requests may read from. */
@@ -51,11 +52,43 @@ export function loadKanban(rootDir: string): KanbanModel {
 export function loadKanbanReport(rootDir: string): KanbanLoadResult {
   const warnings: string[] = []
   const easyCodexDir = join(rootDir, '.easy-codex')
+  const workflowFile = join(easyCodexDir, 'workflow.json')
+  const memosFile = join(easyCodexDir, 'memos.json')
 
-  const state = readJsonFile<WorkflowStateLite>(join(easyCodexDir, 'workflow.json'), warnings)
-  const memos = normalizeMemos(readJsonFile<unknown>(join(easyCodexDir, 'memos.json'), warnings))
+  const state = readJsonFile<WorkflowStateLite>(workflowFile, warnings)
+  const rawMemos = readJsonFile<unknown>(memosFile, warnings)
+  const memos = normalizeMemos(rawMemos)
 
-  return { model: buildKanban({ state, memos }), warnings }
+  // Shape checks beyond JSON parse errors: a present-but-wrong-shaped file
+  // would otherwise silently render as a fresh workflow, hiding the problem
+  // behind the acceptance claim that corruption is surfaced as a warning.
+  if (state !== undefined && !isPhaseName(state.currentPhase)) {
+    warnings.push(`unexpected workflow state shape in ${workflowFile}`)
+  }
+  if (rawMemos !== undefined && memos === undefined) {
+    warnings.push(`unexpected memos shape in ${memosFile}`)
+  }
+
+  return {
+    model: buildKanban({ state, memos, artifactFiles: listArtifactFiles(rootDir) }),
+    warnings,
+  }
+}
+
+/**
+ * List every file under <rootDir>/{specs,tickets,acceptance} as a sorted
+ * repo-relative path (spec BR-3: the board shows a phase's artifacts even when
+ * the approval memo did not record them). Missing dirs are skipped silently;
+ * hidden entries and symlinks are skipped so the listing can never point
+ * outside the artifact dirs.
+ */
+export function listArtifactFiles(rootDir: string): string[] {
+  const resolvedRoot = resolve(rootDir)
+  const files: string[] = []
+  for (const dir of ARTIFACT_DIRS) {
+    collectArtifactFiles(join(resolvedRoot, dir), resolvedRoot, files)
+  }
+  return files.sort()
 }
 
 /**
@@ -74,8 +107,19 @@ export function resolveArtifactPath(rootDir: string, requestPath: string): strin
   // outside the jail below; relative requests anchor at the repo root.
   const resolved = resolve(resolvedRoot, requestPath)
 
+  // Lexical check first (cheap; rejects traversal, absolute paths and paths
+  // that never enter an artifact dir), then a realpath check so a symlink
+  // whose *spelling* sits under specs/ can't escape the jail.
   const allowed = ARTIFACT_DIRS.some((dir) => isInside(resolve(resolvedRoot, dir), resolved))
   if (!allowed) {
+    throw new ArtifactError(`path escapes the artifact directories: ${requestPath}`, 403)
+  }
+
+  const realTarget = realResolvePath(resolved)
+  const reallyInside = ARTIFACT_DIRS.some((dir) =>
+    isInside(realResolvePath(join(resolvedRoot, dir)), realTarget),
+  )
+  if (!reallyInside) {
     throw new ArtifactError(`path escapes the artifact directories: ${requestPath}`, 403)
   }
   return resolved
@@ -134,7 +178,8 @@ function normalizeMemos(parsed: unknown): ApprovalMemoLite[] | undefined {
  * Read + parse a JSON file tolerantly:
  * - missing file → undefined (first run is normal, no warning)
  * - corrupt file → undefined + warning (spec Edge case: banner, no crash)
- * - non-object / wrong-shape payload → undefined (buildKanban validates)
+ * - non-object payload → undefined + warning (shape check at the call site
+ *   additionally validates required fields)
  * - unreadable file (permissions etc.) → rethrows: unexpected I/O errors
  *   should reach the server fn and become the page-level error banner.
  */
@@ -150,11 +195,56 @@ function readJsonFile<T>(file: string, warnings: string[]): T | undefined {
 
   try {
     const parsed: unknown = JSON.parse(raw)
-    if (parsed === null || typeof parsed !== 'object') return undefined
+    if (parsed === null || typeof parsed !== 'object') {
+      warnings.push(`unexpected JSON shape in ${file}`)
+      return undefined
+    }
     return parsed as T
   } catch {
     warnings.push(`corrupt JSON in ${file}`)
     return undefined
+  }
+}
+
+/** Recursive walk for listArtifactFiles; see its doc comment for the rules. */
+function collectArtifactFiles(absDir: string, root: string, out: string[]): void {
+  let entries: Dirent[]
+  try {
+    entries = readdirSync(absDir, { withFileTypes: true })
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') return
+    throw err
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith('.')) continue
+    const abs = join(absDir, entry.name)
+    // isFile() is false for symlinks (and dirs): both are skipped, so the
+    // walk never leaves the artifact dirs through a link.
+    if (entry.isFile()) out.push(relative(root, abs).split(sep).join('/'))
+    else if (entry.isDirectory()) collectArtifactFiles(abs, root, out)
+  }
+}
+
+/**
+ * Resolve symlinks of the closest existing ancestor, then re-append the
+ * remaining (possibly missing) segments. Used to check that a request inside
+ * the artifact dirs does not escape them through a symlink.
+ */
+function realResolvePath(path: string): string {
+  let current = resolve(path)
+  const suffix: string[] = []
+  for (;;) {
+    try {
+      return join(realpathSync.native(current), ...suffix.reverse())
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') throw err
+      const parent = dirname(current)
+      if (parent === current) return resolve(path)
+      suffix.push(basename(current))
+      current = parent
+    }
   }
 }
 
