@@ -32,4 +32,4 @@ Easy Codex 从项目已有的功能和页面出发理解需求，让新增功能
 
 接入自己的项目后，即可围绕多个需求与 Agent 协作。
 
-更完整的产品定义、流程与阶段见 [项目目标](docs/PROJECT_GOALS.md)，前端、两种部署形态与 Agent 的实现选型见 [技术栈](docs/TECH_STACK.md)。
+更完整的产品定义、流程与阶段见 [项目目标](docs/PROJECT_GOALS.md)，前端、两种部署形态与 Agent 的实现选型见 [技术栈](docs/TECH_STACK.md)。开发顺序见 [开发顺序](docs/DEVELOPMENT_SEQUENCE.md)，Agent 协作规则见 [AGENTS.md](AGENTS.md)，每日变更记录见 [docs/changelog](docs/changelog/)。
