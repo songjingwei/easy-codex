@@ -78,6 +78,7 @@ Git 仓库是 Easy Codex 读取项目上下文、生成产物和执行代码改�
 完成标志：
 
 - 后续切片可以重复使用同一个项目样例和需求样例。
+- 默认 fixture：`fixtures/target-app`；默认需求样例：`fixtures/requirements/add-priority-label.md`；验证：`fixtures/scripts/verify.sh`。
 
 ### 切片 2：最小工程骨架
 
